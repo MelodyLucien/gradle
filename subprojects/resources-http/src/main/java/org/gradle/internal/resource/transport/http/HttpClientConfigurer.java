@@ -36,6 +36,7 @@ import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.client.utils.DateUtils;
 import org.apache.http.config.RegistryBuilder;
+import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.util.PublicSuffixMatcher;
 import org.apache.http.conn.util.PublicSuffixMatcherLoader;
@@ -203,6 +204,7 @@ public class HttpClientConfigurer {
             .setSocketTimeout(timeoutSettings.getSocketTimeoutMs())
             .build();
         builder.setDefaultRequestConfig(config);
+        builder.setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(timeoutSettings.getSocketTimeoutMs()).build());
     }
 
     private PasswordCredentials getPasswordCredentials(Authentication authentication) {
