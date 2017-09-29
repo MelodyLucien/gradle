@@ -22,19 +22,23 @@ import static org.gradle.api.logging.configuration.ConsoleOutput.Rich
 import static org.gradle.api.logging.configuration.ConsoleOutput.Verbose
 
 class RichVerboseConsoleTypeFunctionalTest extends AbstractConsoleGroupedTaskFunctionalTest {
-    private static final String HELLO_WORLD_MESSAGE = 'Hello world'
-    private static final String BYE_WORLD_MESSAGE = 'Bye world'
-
     def setup() {
+        executer.withConsole(Verbose)
+    }
+
+    @Unroll
+    def "can have verbose task output according to --console"() {
+        given:
+        executer.withConsole(mode)
         buildFile << """
             task helloWorld {
                 doLast {
-                    logger.quiet '$HELLO_WORLD_MESSAGE'
+                    logger.quiet 'Hello world'
                 }
             }
             task byeWorld {
                 doLast {
-                    logger.quiet '$BYE_WORLD_MESSAGE'
+                    logger.quiet 'Bye world'
                 }
             }
             
@@ -44,22 +48,84 @@ class RichVerboseConsoleTypeFunctionalTest extends AbstractConsoleGroupedTaskFun
                 dependsOn helloWorld, byeWorld, silence
             }
         """
-    }
-
-    @Unroll
-    def "can have verbose task output according to --console"() {
         when:
-        executer.withConsole(mode)
         succeeds('all')
 
         then:
-        result.groupedOutput.task(':helloWorld').output == HELLO_WORLD_MESSAGE
-        result.groupedOutput.task(':byeWorld').output == BYE_WORLD_MESSAGE
+        result.groupedOutput.task(':helloWorld').output == 'Hello world'
+        result.groupedOutput.task(':byeWorld').output == 'Bye world'
         hasSilenceTaskOutput == result.groupedOutput.hasTask(':silence')
 
         where:
         mode    | hasSilenceTaskOutput
         Rich    | false
         Verbose | true
+    }
+
+    def "long running task's output are divided by other output"() {
+        given:
+        buildFile << '''
+def sleepFor(String desc, int times){
+    (1..times).each {
+         Thread.sleep(1000)
+         println "${desc} wake up ${it}"
+    }
+}
+
+task('longRunning').doLast {
+    sleepFor('longRunning', 6)
+    assert false
+}
+
+Thread.start {
+    sleepFor('ungrouped', 6)
+}
+'''
+
+        when:
+        fails('longRunning')
+
+        then:
+        result.groupedOutput.task(':longRunning').groupCount == 2
+        result.groupedOutput.task(':longRunning').getStatus(0) == ''
+        result.groupedOutput.task(':longRunning').getStatus(1) == 'FAILED'
+    }
+
+    def 'failed task result can be rendered'() {
+        given:
+        buildFile << '''
+task myFailure {
+    doLast {
+        assert false
+    }
+}
+'''
+        when:
+        fails('myFailure')
+
+        then:
+        result.groupedOutput.task(':myFailure').getStatus(0) == 'FAILED'
+    }
+
+    def 'up-to-date task result can be rendered'() {
+        given:
+        buildFile << '''
+task upToDate{
+    outputs.upToDateWhen {true}
+    doLast {}
+}
+'''
+        when:
+        succeeds('upToDate')
+
+        then:
+        result.groupedOutput.task(':upToDate').getStatus(0) == ''
+
+        when:
+        executer.withConsole(Verbose)
+        succeeds('upToDate')
+
+        then:
+        result.groupedOutput.task(':upToDate').getStatus(0) == 'UP-TO-DATE'
     }
 }

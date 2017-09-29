@@ -16,6 +16,9 @@
 
 package org.gradle.integtests.fixtures.logging;
 
+import com.google.common.base.Function;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import org.gradle.util.CollectionUtils;
 
 import java.util.ArrayList;
@@ -25,25 +28,47 @@ public class GroupedTaskFixture {
 
     private final String taskName;
 
-    private final List<String> outputs = new ArrayList<String>(1);
+    private final List<SingleGroupResult> groups = new ArrayList<SingleGroupResult>(1);
 
-    public GroupedTaskFixture(String taskName) {
+    GroupedTaskFixture(String taskName) {
         this.taskName = taskName;
     }
 
-    protected void addOutput(String output) {
-        outputs.add(output);
+    void addGroup(String status, String outpuLines) {
+        groups.add(new SingleGroupResult(status, outpuLines));
     }
 
     public String getName() {
         return taskName;
     }
 
+    public String getStatus(int index) {
+        return groups.get(index).status;
+    }
+
+    public int getGroupCount() {
+        return groups.size();
+    }
+
     public String getOutput() {
-        return CollectionUtils.join("\n", outputs);
+        return CollectionUtils.join("\n", getOutputs());
     }
 
     public List<String> getOutputs() {
-        return outputs;
+        return Lists.newArrayList(Iterables.transform(groups, new Function<SingleGroupResult, String>() {
+            public String apply(SingleGroupResult input) {
+                return input.outputLines;
+            }
+        }));
+    }
+
+    private static class SingleGroupResult {
+        private final String status;
+        private final String outputLines;
+
+        private SingleGroupResult(String status, String outputLines) {
+            this.status = status == null ? "" : status;
+            this.outputLines = outputLines;
+        }
     }
 }
